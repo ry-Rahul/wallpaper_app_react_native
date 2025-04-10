@@ -9,6 +9,8 @@ import Categories from "../../components/Categories.js";
 import { apiCall } from "../../api/index.js";
 import ImageGrid from "../../components/ImageGrid.js";
 import { debounce } from "lodash";
+import FilterModal from "../../components/FilterModal.js";
+import BottomSheet from "@gorhom/bottom-sheet";
 
 var page = 1;
 
@@ -19,9 +21,18 @@ const HomeScreen = () => {
   const searchInputRef = useRef(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const [images, setImages] = useState([]);
+  const modelRef = useRef(null);
 
   const handleChangeCategory = (cat) => {
     setActiveCategory(cat);
+    clearSearch();
+    setImages([]);
+    page = 1;
+    let params = { page };
+    if (cat) {
+      params.category = cat;
+    }
+    fetchImages(params, false);
   };
 
   useEffect(() => {
@@ -39,20 +50,33 @@ const HomeScreen = () => {
     setSearch(text);
     if (text.length > 2) {
       page = 1;
-
       setImages([]);
-      fetchImages({ page, q: text });
+      setActiveCategory(null);
+      fetchImages({ page, q: text }, false);
     }
-    if (text == "") {
+    if (text === "") {
       searchInputRef?.current?.clear();
       page = 1;
       setImages([]);
-      fetchImages({ page });
+      setActiveCategory(null);
+      fetchImages({ page }, false);
     }
   };
 
   const handleTextDebounce = useCallback(debounce(handleSearch, 400), []);
 
+  const clearSearch = () => {
+    setSearch("");
+    searchInputRef?.current?.clear();
+  };
+
+  const openFilterModal = () => {
+    modelRef?.current?.present();
+  };
+
+  const closeFilterModal = () => {
+    modelRef?.current?.close();
+  };
 
   return (
     <View style={[styles.container, { paddingTop }]}>
@@ -60,7 +84,7 @@ const HomeScreen = () => {
         <Pressable>
           <Text style={styles.title}>Wallpaper Daily</Text>
         </Pressable>
-        <Pressable>
+        <Pressable onPress={openFilterModal}>
           <FontAwesome6
             name="bars-staggered"
             size={22}
@@ -115,6 +139,8 @@ const HomeScreen = () => {
           )}
         </View>
       </ScrollView>
+
+      <FilterModal ref={modelRef} />
     </View>
   );
 };

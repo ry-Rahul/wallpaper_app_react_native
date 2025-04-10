@@ -26,7 +26,6 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="myapp"/>
         <data android:scheme="com.rahul.wallpaperapp"/>
-        <data android:scheme="exp+wallpaperapp"/>
       </intent-filter>
     </activity>
   </application>
