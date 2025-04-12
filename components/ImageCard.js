@@ -5,13 +5,18 @@ import { getImageSize } from "../helper/common";
 import { theme } from "../constants/theme.js";
 import { hp, wp } from "../helper/common.js";
 
-const ImageCard = ({ item, index, columns }) => {
+const ImageCard = ({ item, index, columns, router }) => {
   const getImageHeight = () => {
     let { imageHeight: height, imageWidth: width } = item;
     return { height: getImageSize(height, width) };
   };
   return (
-    <Pressable style={styles.container}>
+    <Pressable
+      onPress={() =>
+        router.push({ pathname: "home/image", params: { ...item } })
+      }
+      style={styles.container}
+    >
       <Image
         style={[styles.image, getImageHeight()]}
         source={item?.webformatURL}

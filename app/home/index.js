@@ -1,4 +1,12 @@
-import { View, Text, StyleSheet, Pressable, TextInput } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+  ScrollViewBase,
+} from "react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, FontAwesome6, Ionicons } from "@expo/vector-icons";
@@ -10,7 +18,7 @@ import { apiCall } from "../../api/index.js";
 import ImageGrid from "../../components/ImageGrid.js";
 import { debounce } from "lodash";
 import FilterModal from "../../components/FilterModal.js";
-import BottomSheet from "@gorhom/bottom-sheet";
+import { useRouter } from "expo-router";
 
 var page = 1;
 
@@ -21,14 +29,49 @@ const HomeScreen = () => {
   const searchInputRef = useRef(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const [images, setImages] = useState([]);
+  const [filters, setFilters] = useState(null);
+  const [isEndReached, setIsEndReached] = useState(false);
   const modelRef = useRef(null);
+  const scrollRef = useRef(null);
+  const router = useRouter();
+
+  const handleApplyFilters = () => {
+    if (filters) {
+      page = 1;
+      setImages([]);
+      let params = {
+        page,
+        ...filters,
+      };
+      if (activeCategory) params.category = activeCategory;
+      if (search) params.q = search;
+      fetchImages(params, false);
+    }
+    closeFilterModal();
+  };
+
+  const handleResetFilters = () => {
+    if (filters) {
+      page = 1;
+      setFilters(null);
+      setImages([]);
+      let params = {
+        page,
+      };
+      if (activeCategory) params.category = activeCategory;
+      if (search) params.q = search;
+      fetchImages(params, false);
+    }
+
+    closeFilterModal();
+  };
 
   const handleChangeCategory = (cat) => {
     setActiveCategory(cat);
     clearSearch();
     setImages([]);
     page = 1;
-    let params = { page };
+    let params = { page, ...filters };
     if (cat) {
       params.category = cat;
     }
@@ -40,6 +83,8 @@ const HomeScreen = () => {
   }, []);
 
   const fetchImages = async (params = { page: 1 }, append = true) => {
+    console.log("===============", params);
+
     let res = await apiCall(params);
     if (res.success && res?.data?.hits) {
       setImages(append ? [...images, ...res.data.hits] : [...res.data.hits]);
@@ -52,14 +97,14 @@ const HomeScreen = () => {
       page = 1;
       setImages([]);
       setActiveCategory(null);
-      fetchImages({ page, q: text }, false);
+      fetchImages({ page, q: text, ...filters }, false);
     }
     if (text === "") {
       searchInputRef?.current?.clear();
       page = 1;
       setImages([]);
       setActiveCategory(null);
-      fetchImages({ page }, false);
+      fetchImages({ page, ...filters }, false);
     }
   };
 
@@ -78,10 +123,45 @@ const HomeScreen = () => {
     modelRef?.current?.close();
   };
 
+  const handleRemoveFilter = (key) => {
+    let newFilters = { ...filters };
+    delete newFilters[key];
+    setFilters({ ...newFilters });
+    setImages([]);
+    let params = { page, ...newFilters };
+    if (activeCategory) params.category = activeCategory;
+    if (search) params.q = search;
+    fetchImages(params, false);
+  };
+
+  const handleScroll = (event) => {
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const scrollViewHeight = event.nativeEvent.layoutMeasurement.height;
+    const scrolloffset = event.nativeEvent.contentOffset.y;
+    const bottomPosition = contentHeight - scrollViewHeight;
+    if (scrolloffset >= bottomPosition - 1) {
+      if (!isEndReached) {
+        setIsEndReached(true);
+        page++;
+        let params = {
+          page,
+          ...filters,
+        };
+        if (activeCategory) params.category = activeCategory;
+        if (search) params.q = search;
+        fetchImages(params, true);
+      }
+    } else if (isEndReached) {
+      setIsEndReached(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop }]}>
       <View style={styles.header}>
-        <Pressable>
+        <Pressable
+          onPress={() => scrollRef?.current?.scrollTo({ y: 0, animated: true })}
+        >
           <Text style={styles.title}>Wallpaper Daily</Text>
         </Pressable>
         <Pressable onPress={openFilterModal}>
@@ -93,7 +173,12 @@ const HomeScreen = () => {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ gap: 15 }}>
+      <ScrollView
+        onScroll={handleScroll}
+        scrollEventThrottle={5}
+        ref={scrollRef}
+        contentContainerStyle={{ gap: 15 }}
+      >
         <View style={styles.searchbar}>
           <View style={styles.searchIcon}>
             <Feather
@@ -131,16 +216,67 @@ const HomeScreen = () => {
           />
         </View>
 
+        {filters && (
+          <View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filter}
+            >
+              {Object.keys(filters).map((key, index) => {
+                return (
+                  <View key={index} style={styles.filterItem}>
+                    {key === "colors" ? (
+                      <View
+                        style={[
+                          styles.colorFilter,
+                          { backgroundColor: filters[key] },
+                        ]}
+                      />
+                    ) : (
+                      <Text style={styles.filterText}>{filters[key]}</Text>
+                    )}
+
+                    <Pressable
+                      style={styles.removeFilter}
+                      onPress={() => handleRemoveFilter(key)}
+                    >
+                      <Ionicons
+                        name="close"
+                        size={14}
+                        color={theme.colors.neutral(0.9)}
+                      />
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         <View>
           {images.length > 0 ? (
-            <ImageGrid images={images} />
+            <ImageGrid images={images} router={router} />
           ) : (
             <Text>No images found</Text>
           )}
         </View>
+
+        <View
+          style={{ marginBottom: 70, marginTop: images.length > 0 ? 10 : 70 }}
+        >
+          <ActivityIndicator size="large" />
+        </View>
       </ScrollView>
 
-      <FilterModal ref={modelRef} />
+      <FilterModal
+        ref={modelRef}
+        filters={filters}
+        setFilters={setFilters}
+        onClose={closeFilterModal}
+        onApply={handleApplyFilters}
+        onReset={handleResetFilters}
+      />
     </View>
   );
 };
@@ -186,6 +322,33 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.neutral(0.1),
     padding: 8,
     borderRadius: theme.radius.sm,
+  },
+  filter: {
+    paddingHorizontal: wp(4),
+    gap: 10,
+  },
+  filterItem: {
+    backgroundColor: theme.colors.grayBG,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: theme.radius.XS,
+    padding: 5,
+    gap: 10,
+    paddingHorizontal: 10,
+  },
+  filterText: {
+    fontSize: hp(1.6),
+  },
+  removeFilter: {
+    padding: 3,
+    borderRadius: 7,
+    backgroundColor: theme.colors.neutral(0.2),
+  },
+  colorFilter: {
+    width: wp(8),
+    height: wp(5),
+    borderRadius: 7,
+    backgroundColor: theme.colors.neutral(0.2),
   },
 });
 

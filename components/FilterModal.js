@@ -1,20 +1,20 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import React, { useMemo, forwardRef, useImperativeHandle, useRef } from "react";
-import BottomSheet, {
-  BottomSheetModal,
-  BottomSheetView,
-} from "@gorhom/bottom-sheet";
+import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { BlurView } from "expo-blur";
 import Animated, {
   Extrapolation,
+  FadeInDown,
   interpolate,
   useAnimatedStyle,
 } from "react-native-reanimated";
 import { theme } from "../constants/theme";
-import { hp } from "../helper/common";
-import FilterViews, { CommonFilterRow, OrderView } from "./FilterViews";
+import { capitalize, hp } from "../helper/common";
+import FilterViews, { ColourFilter, CommonFilterRow } from "./FilterViews";
+import { data } from "../constants/data";
 
 const FilterModal = forwardRef((props, ref) => {
+  const { filters, setFilters, onClose, onApply, onReset } = props;
   const snapPoints = useMemo(() => ["75%"], []);
   const bottomSheetRef = useRef(null);
 
@@ -36,12 +36,47 @@ const FilterModal = forwardRef((props, ref) => {
           <Text style={styles.filterText}>Filters</Text>
           {Object.keys(sections).map((sectionName, index) => {
             let sectionView = sections[sectionName];
+            let sectionData = data.filters[sectionName];
             return (
-              <View key={sectionName}>
-                <FilterViews title={sectionName} content={sectionView({})} />
-              </View>
+              <Animated.View
+                entering={FadeInDown.delay(index * 100 + 100)
+                  .springify()
+                  .damping(11)}
+                key={sectionName}
+              >
+                <FilterViews
+                  title={capitalize(sectionName)}
+                  content={sectionView({
+                    data: sectionData,
+                    filters,
+                    setFilters,
+                    filterName: sectionName,
+                  })}
+                />
+              </Animated.View>
             );
           })}
+
+          <Animated.View
+            entering={FadeInDown.delay(500).springify().damping(11)}
+            style={styles.buttons}
+          >
+            <Pressable style={styles.resetButton} onPress={onReset}>
+              <Text
+                style={[
+                  styles.buttonText,
+                  { color: theme.colors.neutral(0.9) },
+                ]}
+              >
+                Reset
+              </Text>
+            </Pressable>
+            <Pressable style={styles.applyButton} onPress={onApply}>
+              <Text style={[styles.buttonText, { color: theme.colors.white }]}>
+                Apply
+              </Text>
+            </Pressable>
+          </Animated.View>
         </View>
       </BottomSheetView>
     </BottomSheetModal>
@@ -52,7 +87,7 @@ const sections = {
   order: (props) => <CommonFilterRow {...props} />,
   orientation: (props) => <CommonFilterRow {...props} />,
   type: (props) => <CommonFilterRow {...props} />,
-  colors: (props) => <CommonFilterRow {...props} />,
+  colors: (props) => <ColourFilter {...props} />,
 };
 
 const CustomBackdrop = ({ animatedIndex, style }) => {
@@ -77,7 +112,7 @@ const CustomBackdrop = ({ animatedIndex, style }) => {
 
   return (
     <Animated.View style={containerStyle}>
-      <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+      <BlurView style={StyleSheet.absoluteFill} tint="dark" intensity={50} />
     </Animated.View>
   );
 };
@@ -97,7 +132,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   content: {
-    width: "100%",
+    flex: 1,
+    // width: "100%",
     gap: 15,
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -107,6 +143,35 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.neutral(0.8),
     marginBottom: 5,
+  },
+  buttons: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: theme.colors.neutral(0.8),
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+  },
+  resetButton: {
+    flex: 1,
+    backgroundColor: theme.colors.neutral(0.03),
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    borderWidth: 2,
+    borderColor: theme.colors.neutral(0.2),
+  },
+  buttonText: {
+    fontSize: hp(2),
   },
 });
 
